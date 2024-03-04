@@ -122,8 +122,11 @@
 				<div class="about-content">
 					<div class="row">
 						<div class="col-sm-2">
-							<ul class="nav flex-column" onclick="loadPage('2024-02-09')" style="cursor: pointer;">
-								<li class="nav-item">
+							<ul class="nav flex-column" style="cursor: pointer;">
+								<li class="nav-item" onclick="loadPage('20240301')">
+									<a class="nav-link active" aria-current="page" >2024-03-01</a>
+								  </li>
+								<li class="nav-item" onclick="loadPage('20240209')">
 								  <a class="nav-link active" aria-current="page" >2024-02-09</a>
 								</li>
 							</ul>
@@ -211,13 +214,12 @@
     </body>
 
 	<script>
-		function loadPage(str){
-			if(str == '2024-02-09'){
-				$('#obj-content').attr('data', '20240209.html');
-			}
+		function loadPage(str){			
+			$('#obj-content').attr('data',  str + '.html');
 		}
 		
 		$(document).ready(function(){
+			loadPage('20240301');
 		});
 	</script>
 	
