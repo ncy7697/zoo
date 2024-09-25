@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>카드 짝 맞추기 게임</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 100px);
+            gap: 10px;
+        }
+        .card {
+            width: 100px;
+            height: 100px;
+            background-color: #ddd;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .card.flipped {
+            transform: rotateY(180deg);
+            background-color: white;
+            font-size: 40px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        #level {
+            font-size: 18px;
+            margin-right: 10px;
+        }
+        #startGame {
+            font-size: 18px;
+            padding: 5px 10px;
+        }
+        #chances {
+            font-size: 18px;
+            margin-left: 10px;
+        }
+        #score {
+            font-size: 18px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <span id="levelDisplay">레벨: 1</span>
+        <button id="startGame">게임 시작</button>
+        <span id="chances">남은 기회: 5</span>
+        <span id="score">점수: 0</span>
+    </div>
+    <div class="game-board"></div>
+
+    <script>
+        const gameBoard = document.querySelector('.game-board');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const startGameButton = document.getElementById('startGame');
+        const emojis = ['🍎', '🍌', '🍇', '🍊', '🍓', '🍑', '🍍', '🥝', '🍉', '🍐', '🍒', '🥭', '🍋', '🥑', '🍈', '🍏'];
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let currentLevel = 1;
+        let remainingChances = 5;
+        let currentScore = 0;
+        let totalScore = 0;
+        const chancesDisplay = document.getElementById('chances');
+        const scoreDisplay = document.getElementById('score');
+
+        startGameButton.addEventListener('click', startGame);
+
+        function startGame() {
+            levelDisplay.textContent = `레벨: ${currentLevel}`;
+            remainingChances = 5;
+            chancesDisplay.textContent = `남은 기회: ${remainingChances}`;
+            scoreDisplay.textContent = `점수: ${totalScore}`;
+
+            const cardCount = Math.min(4 + Math.floor((currentLevel - 1) / 5) * 2, 32);
+            const pairCount = cardCount / 2;
+            cards = emojis.slice(0, pairCount).concat(emojis.slice(0, pairCount));
+            cards.sort(() => Math.random() - 0.5);
+
+            gameBoard.innerHTML = '';
+            flippedCards = [];
+            matchedPairs = 0;
+
+            gameBoard.style.gridTemplateColumns = `repeat(${Math.ceil(Math.sqrt(cardCount))}, 100px)`;
+
+            cards.forEach((emoji, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.index = index;
+                card.addEventListener('click', flipCard);
+                gameBoard.appendChild(card);
+            });
+        }
+
+        function flipCard() {
+            if (flippedCards.length < 2 && !this.classList.contains('flipped')) {
+                this.classList.add('flipped');
+                this.textContent = cards[this.dataset.index];
+                flippedCards.push(this);
+
+                if (flippedCards.length === 2) {
+                    setTimeout(checkMatch, 500);
+                }
+            }
+        }
+
+        function checkMatch() {
+            const [card1, card2] = flippedCards;
+            if (card1.textContent === card2.textContent) {
+                card1.removeEventListener('click', flipCard);
+                card2.removeEventListener('click', flipCard);
+                matchedPairs++;
+                currentScore += calculateScore();
+                totalScore += currentScore;
+                scoreDisplay.textContent = `점수: ${totalScore}`;
+                if (matchedPairs === cards.length / 2) {
+                    setTimeout(() => {
+                        alert(`축하합니다! 레벨 ${currentLevel}을 클리어하셨습니다! 현재 총점: ${totalScore}`);
+                        currentLevel++;
+                        startGame(); // 다음 레벨로 자동 시작
+                    }, 500);
+                }
+            } else {
+                remainingChances--;
+                chancesDisplay.textContent = `남은 기회: ${remainingChances}`;
+                if (remainingChances === 0) {
+                    setTimeout(() => {
+                        alert(`게임 오버! 레벨 ${currentLevel}에서 실패하셨습니다. 최종 점수: ${totalScore}`);
+                        currentLevel = 1; // 레벨 초기화
+                        totalScore = 0; // 총점 초기화
+                        startGame(); // 게임을 재시작합니다.
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                        card1.classList.remove('flipped');
+                        card2.classList.remove('flipped');
+                        card1.textContent = '';
+                        card2.textContent = '';
+                    }, 500);
+                }
+            }
+            flippedCards = [];
+        }
+
+        function calculateScore() {
+            // 레벨과 남은 기회에 따라 점수 계산
+            return currentLevel * 10 + remainingChances * 5;
+        }
+    </script>
+</body>
+</html>

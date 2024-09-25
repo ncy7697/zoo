@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>테트리스 게임</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+        #game-board {
+            border: 2px solid #ffffff;
+        }
+        .flash {
+            animation: flash 0.5s;
+        }
+        @keyframes flash {
+            0%, 50% { background-color: white; }
+            25%, 75% { background-color: #1a1a1a; }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-board" width="300" height="600"></canvas>
+        <button id="start-button">시작</button>
+        <button id="pause-button">중지</button>
+        <div id="level-display">레벨: 1</div>
+        <div id="score-display">점수: 0</div>
+    </div>
+    <script>
+        const canvas = document.getElementById('game-board');
+        const ctx = canvas.getContext('2d');
+        const ROWS = 20;
+        const COLS = 10;
+        const BLOCK_SIZE = 30;
+        let board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+        let currentPiece;
+
+        const COLORS = [
+            '#FF0000', // 빨강
+            '#00FF00', // 초록
+            '#0000FF', // 파랑
+            '#FFFF00', // 노랑
+            '#FF00FF', // 마젠타
+            '#00FFFF', // 시안
+            '#FFA500', // 주황
+            '#800080', // 보라
+            '#008000', // 진한 초록
+            '#000080', // 네이비
+            '#8B4513'  // 갈색
+        ];
+
+        const SHAPES = [
+            { shape: [[1,1,1,1]], color: COLORS[0] },           // I 모양
+            { shape: [[1,1],[1,1]], color: COLORS[1] },         // O 모양
+            { shape: [[1,1,1],[0,1,0]], color: COLORS[2] },     // T 모양
+            { shape: [[1,1,1],[1,0,0]], color: COLORS[3] },     // L 모양
+            { shape: [[1,1,1],[0,0,1]], color: COLORS[4] },     // J 모양
+            { shape: [[1,1,0],[0,1,1]], color: COLORS[5] },     // S 모양
+            { shape: [[0,1,1],[1,1,0]], color: COLORS[6] },     // Z 모양
+            { shape: [[1,1,0,0],[0,1,1,1]], color: COLORS[7] }, // 긴 L 모양
+            { shape: [[0,0,1,1],[1,1,1,0]], color: COLORS[8] }, // 긴 J 모양
+            { shape: [[1,1,1],[1,0,1]], color: COLORS[9] },     // U 모양
+            { shape: [[1,0,0],[1,1,1],[1,0,0]], color: COLORS[10] } // 십자가 모양
+        ];
+
+        let gameRunning = false;
+        let gamePaused = false;
+        const startButton = document.getElementById('start-button');
+        const pauseButton = document.getElementById('pause-button');
+        let level = 1;
+        const MAX_LEVEL = 100;
+        let score = 0;
+        let linesCleared = 0;
+        let moveDownInterval;
+        const levelDisplay = document.getElementById('level-display');
+        const scoreDisplay = document.getElementById('score-display');
+
+        function startGame() {
+            if (!gameRunning) {
+                gameRunning = true;
+                gamePaused = false;
+                level = 1;
+                score = 0;
+                linesCleared = 0;
+                updateLevel();
+                updateScore();
+                newPiece();
+                gameLoop();
+                setMoveDownInterval();
+                startButton.textContent = '재시작';
+                pauseButton.disabled = false;
+            } else {
+                // 게임 재시작 로직
+                gameRunning = false;
+                gamePaused = false;
+                clearInterval(moveDownInterval);
+                board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+                startGame();
+            }
+        }
+
+        function setMoveDownInterval() {
+            clearInterval(moveDownInterval);
+            const baseSpeed = 1000;
+            const minSpeed = 50;
+            const speedDecrease = (baseSpeed - minSpeed) / (MAX_LEVEL - 1);
+            const speed = Math.max(minSpeed, baseSpeed - (level - 1) * speedDecrease);
+            moveDownInterval = setInterval(moveDown, speed);
+        }
+
+        function updateLevel() {
+            level = Math.min(MAX_LEVEL, Math.floor(linesCleared / 5) + 1);
+            levelDisplay.textContent = `레벨: ${level}`;
+            setMoveDownInterval();
+        }
+
+        function updateScore() {
+            scoreDisplay.textContent = `점수: ${score}`;
+        }
+
+        function pauseGame() {
+            if (gameRunning) {
+                if (gamePaused) {
+                    gamePaused = false;
+                    gameLoop();
+                    setMoveDownInterval();
+                    pauseButton.textContent = '중지';
+                } else {
+                    gamePaused = true;
+                    clearInterval(moveDownInterval);
+                    pauseButton.textContent = '계속';
+                }
+            }
+        }
+
+        startButton.addEventListener('click', startGame);
+        pauseButton.addEventListener('click', pauseGame);
+
+        function drawBoard() {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c]) {
+                        ctx.fillStyle = board[r][c];
+                        ctx.fillRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+                    }
+                }
+            }
+        }
+
+        function newPiece() {
+            const randomPiece = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+            currentPiece = {
+                shape: randomPiece.shape,
+                color: randomPiece.color,
+                x: Math.floor(COLS / 2) - Math.floor(randomPiece.shape[0].length / 2),
+                y: 0
+            };
+        }
+
+        function drawPiece() {
+            ctx.fillStyle = currentPiece.color;
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c]) {
+                        ctx.fillRect((currentPiece.x + c) * BLOCK_SIZE, (currentPiece.y + r) * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+                    }
+                }
+            }
+        }
+
+        function moveDown() {
+            currentPiece.y++;
+            if (collision()) {
+                currentPiece.y--;
+                merge();
+                newPiece();
+                if (collision()) {
+                    // 게임 오버
+                    board = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+                }
+            }
+        }
+
+        function collision() {
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c] && 
+                        (currentPiece.y + r >= ROWS ||
+                         currentPiece.x + c < 0 ||
+                         currentPiece.x + c >= COLS ||
+                         board[currentPiece.y + r][currentPiece.x + c])) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function merge() {
+            for (let r = 0; r < currentPiece.shape.length; r++) {
+                for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                    if (currentPiece.shape[r][c]) {
+                        board[currentPiece.y + r][currentPiece.x + c] = currentPiece.color;
+                    }
+                }
+            }
+            clearLines();
+        }
+
+        function clearLines() {
+            let lines = 0;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (board[r].every(cell => cell !== 0)) {
+                    lines++;
+                    // 줄 제거 애니메이션
+                    for (let c = 0; c < COLS; c++) {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+                    }
+                    // 애니메이션 효과
+                    canvas.classList.add('flash');
+                    setTimeout(() => {
+                        canvas.classList.remove('flash');
+                        // 위의 줄들을 아래로 이동
+                        for (let y = r; y > 0; y--) {
+                            board[y] = [...board[y-1]];
+                        }
+                        board[0] = Array(COLS).fill(0);
+                        drawBoard();
+                    }, 100);
+                }
+            }
+            if (lines > 0) {
+                linesCleared += lines;
+                score += lines * lines * 100 * level; // 점수 계산
+                updateLevel();
+                updateScore();
+            }
+        }
+
+        function moveLeft() {
+            currentPiece.x--;
+            if (collision()) {
+                currentPiece.x++;
+            }
+        }
+
+        function moveRight() {
+            currentPiece.x++;
+            if (collision()) {
+                currentPiece.x--;
+            }
+        }
+
+        function rotate() {
+            const rotated = currentPiece.shape[0].map((_, i) => 
+                currentPiece.shape.map(row => row[i]).reverse()
+            );
+            const prevShape = currentPiece.shape;
+            currentPiece.shape = rotated;
+            if (collision()) {
+                currentPiece.shape = prevShape;
+            }
+        }
+
+        document.addEventListener('keydown', event => {
+            if (gameRunning) {
+                switch(event.keyCode) {
+                    case 37: moveLeft(); break;
+                    case 39: moveRight(); break;
+                    case 40: moveDown(); break;
+                    case 38: rotate(); break;
+                }
+            }
+        });
+
+        function gameLoop() {
+            if (gameRunning && !gamePaused) {
+                drawBoard();
+                drawPiece();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+    </script>
+</body>
+</html>
+
